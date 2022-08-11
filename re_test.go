@@ -202,6 +202,52 @@ func TestReFunc(t *testing.T) {
 	}
 }
 
+func TestRePosition(t *testing.T) {
+	hp := `(\w+):(\d+)`
+	bytes := []byte("host:1234 host2:2345")
+	var pos re.Position
+	var host string
+	var port int
+	if err := re.Scan(regexp.MustCompile(hp), bytes, &pos, &host, &port); err != nil {
+		t.Fatalf("First match: unexpected error: %s", err)
+	} else {
+		if pos.Start != 0 {
+			t.Errorf("First match: pos.Start = %d, want 0", pos.Start)
+		}
+		if pos.End != 9 {
+			t.Errorf("First match: pos.End = %d, want 9", pos.End)
+		}
+		if host != "host" {
+			t.Errorf("First match: host = %s, want \"host\"", host)
+		}
+		if port != 1234 {
+			t.Errorf("First match: port = %d, want 1234", port)
+		}
+	}
+
+	bytes = bytes[pos.End:]
+
+	if err := re.Scan(regexp.MustCompile(hp), bytes, &pos, &host, &port); err != nil {
+		t.Fatalf("Second match: unexpected error: %s", err)
+	} else {
+		// Offsets in the second Scan call should count from the beginning of the tail,
+		// not from the beginning of the original string.
+		if pos.Start != 1 {
+			t.Errorf("Second match: pos.Start = %d, want 1", pos.Start)
+		}
+		if pos.End != 11 {
+			t.Errorf("Second match: pos.End = %d, want 11", pos.End)
+		}
+		if host != "host2" {
+			t.Errorf("Second match: host = %s, want \"host2\"", host)
+		}
+		if port != 2345 {
+			t.Errorf("Second match: port = %d, want 2345", port)
+		}
+	}
+
+}
+
 func TestReAliasing(t *testing.T) {
 	b := []byte("hello")
 	var m []byte

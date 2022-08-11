@@ -29,6 +29,11 @@ import (
 	"strconv"
 )
 
+type Position struct {
+	Start int
+	End   int
+}
+
 // Scan returns nil if regular expression re matches somewhere in
 // input, and for every non-nil entry in output, the corresponding
 // regular expression sub-match is succesfully parsed and stored into
@@ -74,6 +79,13 @@ func Scan(re *regexp.Regexp, input []byte, output ...interface{}) error {
 	if matches == nil {
 		return fmt.Errorf(`re.Scan: could not find "%s" in "%s"`,
 			re, input)
+	}
+	if len(output) > 0 {
+		if p, ok := output[0].(*Position); ok {
+			p.Start = matches[0]
+			p.End = matches[1]
+			output = output[1:]
+		}
 	}
 	if len(matches) < 2+2*len(output) {
 		return fmt.Errorf(`re.Scan: only got %d matches from "%s"; need at least %d`,
