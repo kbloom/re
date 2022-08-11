@@ -202,6 +202,51 @@ func TestReFunc(t *testing.T) {
 	}
 }
 
+func TestOptional(t *testing.T) {
+	hp := regexp.MustCompile(`^(\w+)(?::(\d+))?$`)
+
+	cases := []struct {
+		haystack string
+		host     string
+		port     int
+		hasPort  bool
+	}{
+		{
+			haystack: "host:1234",
+			host:     "host",
+			port:     1234,
+			hasPort:  true,
+		},
+		{
+			haystack: "host",
+			host:     "host",
+			hasPort:  false,
+		},
+	}
+
+	for _, c := range cases {
+		var (
+			host    string
+			port    int
+			hasPort bool
+		)
+
+		if err := re.Scan(hp, []byte(c.haystack), &host, re.Optional(&port, &hasPort)); err != nil {
+			t.Errorf("re.Scan(%s, %s, ...) unexpected error: %s", hp, c.haystack, err)
+			continue
+		}
+		if host != c.host {
+			t.Errorf("re.Scan(%s, %s, ...): host =  %s, want %s", hp, c.haystack, host, c.host)
+		}
+		if port != c.port {
+			t.Errorf("re.Scan(%s, %s, ...): port =  %d, want %d", hp, c.haystack, port, c.port)
+		}
+		if hasPort != c.hasPort {
+			t.Errorf("re.Scan(%s, %s, ...): hasPort =  %T, want %T", hp, c.haystack, hasPort, c.hasPort)
+		}
+	}
+}
+
 func TestRePosition(t *testing.T) {
 	hp := `(\w+):(\d+)`
 	bytes := []byte("host:1234 host2:2345")

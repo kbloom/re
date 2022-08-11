@@ -94,11 +94,16 @@ func Scan(re *regexp.Regexp, input []byte, output ...interface{}) error {
 	for i, r := range output {
 		start, limit := matches[2+2*i], matches[2+2*i+1]
 		if start < 0 || limit < 0 {
-			// Sub-expression is missing; treat as empty.
-			start = 0
-			limit = 0
-		}
-		if err := assign(r, input[start:limit]); err != nil {
+			// Sub-expression is missing; pass nil to treat as empty.
+			// It's generally frowned upon, but one could use a
+			// comparison with nil in a parsing function to tell
+			// the difference between zero-length subexpression match
+			// (e.g. (\d*) and a subexpression that was skipped by being made
+			// optional (e.g. `(\d+)?`)
+			if err := assign(r, nil); err != nil {
+				return err
+			}
+		} else if err := assign(r, input[start:limit]); err != nil {
 			return err
 		}
 	}
@@ -213,4 +218,21 @@ func assign(r interface{}, b []byte) error {
 
 func parseError(explanation string, b []byte) error {
 	return fmt.Errorf(`re.Scan: parsing "%s": %s`, b, explanation)
+}
+
+// Optional identifies whether an optional matching group matched part
+// of the regular expression. For example, When matching the regular expression
+// `foo (.)? bar` against the string "foo  bar", matched will be set to false,
+// and value will be unchanged. When matching against the string "foo x bar",
+// matched will be set to true, and value will be changed to x.
+func Optional(value interface{}, matched *bool) func([]byte) error {
+	return func(matchText []byte) error {
+		if matchText == nil {
+			*matched = false
+			return nil
+		} else {
+			*matched = true
+			return assign(value, matchText)
+		}
+	}
 }
