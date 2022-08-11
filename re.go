@@ -29,6 +29,15 @@ import (
 	"strconv"
 )
 
+// Range is a special type designed to be passed via pointer to Scan. When
+// passed as the third parameter to Scan, Scan will record position information
+// for the match.  This can be used in a loop to continue scanning from the end
+// of previous first match.
+type Range struct {
+	Start int
+	End   int
+}
+
 // Scan returns nil if regular expression re matches somewhere in
 // input, and for every non-nil entry in output, the corresponding
 // regular expression sub-match is succesfully parsed and stored into
@@ -74,6 +83,13 @@ func Scan(re *regexp.Regexp, input []byte, output ...interface{}) error {
 	if matches == nil {
 		return fmt.Errorf(`re.Scan: could not find "%s" in "%s"`,
 			re, input)
+	}
+	if len(output) > 0 {
+		if p, ok := output[0].(*Range); ok {
+			p.Start = matches[0]
+			p.End = matches[1]
+			output = output[1:]
+		}
 	}
 	if len(matches) < 2+2*len(output) {
 		return fmt.Errorf(`re.Scan: only got %d matches from "%s"; need at least %d`,

@@ -202,6 +202,68 @@ func TestReFunc(t *testing.T) {
 	}
 }
 
+func TestRange(t *testing.T) {
+
+	type testMatch struct {
+		Range re.Range
+		Host  string
+		Port  int
+	}
+	type testCase struct {
+		input   string
+		matches []testMatch
+	}
+
+	cases := []testCase{
+		{
+			input: "host:1234 host2:2345",
+			matches: []testMatch{
+				{
+					Range: re.Range{Start: 0, End: 9},
+					Host:  "host",
+					Port:  1234,
+				},
+				{
+					Range: re.Range{Start: 1, End: 11},
+					Host:  "host2",
+					Port:  2345,
+				},
+			},
+		},
+	}
+
+	pattern := regexp.MustCompile(`(\w+):(\d+)`)
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			input := []byte(c.input)
+			for idx, match := range c.matches {
+				var rng re.Range
+				var host string
+				var port int
+
+				err := re.Scan(pattern, input, &rng, &host, &port)
+				if err != nil {
+					t.Fatalf("Scan attempt %d: unexpected error %s", idx, err)
+				}
+				if rng.Start != match.Range.Start {
+					t.Errorf("Scan attempt %d: rng.Start = %d, want %d", idx, rng.Start, match.Range.Start)
+				}
+				if rng.End != match.Range.End {
+					t.Errorf("Scan attempt %d: rng.End = %d, want %d", idx, rng.End, match.Range.End)
+				}
+				if host != match.Host {
+					t.Errorf("Scan attempt %d: host = %s, want %s", idx, host, match.Host)
+				}
+				if port != match.Port {
+					t.Errorf("Scan attempt %d: port = %d, want %d", idx, port, match.Port)
+				}
+				input = input[rng.End:]
+			}
+		})
+	}
+}
+
 func TestReAliasing(t *testing.T) {
 	b := []byte("hello")
 	var m []byte
