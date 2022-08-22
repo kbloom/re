@@ -79,9 +79,15 @@ func ExampleScan_repeatedly() {
 			port int
 		)
 		err := re.Scan(r, line, &rng, &host, &port)
-		if err != nil {
+		if _, notFound := err.(re.NotFoundError); notFound {
+			// Terminate the loop. We're done scanning.
 			break
+		} else if err != nil {
+			// If this wasn't example code, we'd return the error to the caller here.
+			fmt.Println("Error encountered:", err)
+			return
 		}
+
 		fmt.Println("host:", host, "port:", port)
 		line = line[rng.End:]
 	}

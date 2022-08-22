@@ -38,6 +38,32 @@ type Range struct {
 	End   int
 }
 
+// NotFoundError is the error returned by re.Scan when
+// the regexp didn't match the string.
+type NotFoundError struct {
+	re    *regexp.Regexp
+	input []byte
+}
+
+func (e NotFoundError) Error() string {
+	return fmt.Sprintf(`re.Scan: could not find "%s" in "%s"`,
+		e.re, e.input)
+}
+
+// ParseError is the error retured by re.Scan when a submatch couldn't be
+// parsed in the format expected by the corresponding submatch output.
+type ParseError struct {
+	underlying error
+}
+
+func (e ParseError) Error() string {
+	return e.underlying.Error()
+}
+
+func (e ParseError) Unwrap() error {
+	return e.underlying
+}
+
 // Scan returns nil if regular expression re matches somewhere in
 // input, and for every non-nil entry in output, the corresponding
 // regular expression sub-match is succesfully parsed and stored into
@@ -81,8 +107,10 @@ type Range struct {
 func Scan(re *regexp.Regexp, input []byte, output ...interface{}) error {
 	matches := re.FindSubmatchIndex(input)
 	if matches == nil {
-		return fmt.Errorf(`re.Scan: could not find "%s" in "%s"`,
-			re, input)
+		return NotFoundError{
+			re:    re,
+			input: input,
+		}
 	}
 	if len(output) > 0 {
 		if p, ok := output[0].(*Range); ok {
@@ -103,7 +131,7 @@ func Scan(re *regexp.Regexp, input []byte, output ...interface{}) error {
 			limit = 0
 		}
 		if err := assign(r, input[start:limit]); err != nil {
-			return err
+			return ParseError{err}
 		}
 	}
 	return nil
@@ -127,7 +155,7 @@ func assign(r interface{}, b []byte) error {
 			return err
 		}
 		if int64(int(i)) != i {
-			return parseError("out of range for int", b)
+			return fmt.Errorf("out of range for int: %s", b)
 		}
 		*v = int(i)
 	case *int8:
@@ -160,7 +188,7 @@ func assign(r interface{}, b []byte) error {
 			return err
 		}
 		if uint64(uint(u)) != u {
-			return parseError("out of range for uint", b)
+			return fmt.Errorf("out of range for uint: %s", b)
 		}
 		*v = uint(u)
 	case *uintptr:
@@ -169,7 +197,7 @@ func assign(r interface{}, b []byte) error {
 			return err
 		}
 		if uint64(uintptr(u)) != u {
-			return parseError("out of range for uintptr", b)
+			return fmt.Errorf("out of range for uintptr: %s", b)
 		}
 		*v = uintptr(u)
 	case *uint8:
@@ -210,11 +238,7 @@ func assign(r interface{}, b []byte) error {
 		*v = f
 	default:
 		t := reflect.ValueOf(r).Type()
-		return parseError(fmt.Sprintf("unsupported type %s", t), b)
+		return fmt.Errorf("unsupported type %s", t)
 	}
 	return nil
-}
-
-func parseError(explanation string, b []byte) error {
-	return fmt.Errorf(`re.Scan: parsing "%s": %s`, b, explanation)
 }
