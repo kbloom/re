@@ -99,6 +99,12 @@ func (e ParseError) Unwrap() error {
 // (normally Scan would treat such as a number as octal); or parsing
 // an otherwise unsupported type like time.Duration.
 //
+// func([]byte, Range) error: This is another supported form of custom
+// parsing function. The function is passed the corresponding
+// sub-match, and Range specifying the start and end position of
+// the sub-match. If the sub-match was optional (e.g. it was followed by
+// a question mark), then the Start and End of the range are -1.
+//
 // An error is returned if output[i] does not have one of the preceding
 // types.  Caveat: the set of supported types might be extended in the
 // future.
@@ -124,25 +130,31 @@ func Scan(re *regexp.Regexp, input []byte, output ...interface{}) error {
 			len(matches)/2-1, re, len(output))
 	}
 	for i, r := range output {
-		start, limit := matches[2+2*i], matches[2+2*i+1]
-		if start < 0 || limit < 0 {
-			// Sub-expression is missing; treat as empty.
-			start = 0
-			limit = 0
+		rng := Range{
+			Start: matches[2+2*i],
+			End:   matches[2+2*i+1],
 		}
-		if err := assign(r, input[start:limit]); err != nil {
+		var text []byte
+		if rng.Start >= 0 && rng.End >= 0 {
+			text = input[rng.Start:rng.End]
+		}
+		if err := assign(r, text, rng); err != nil {
 			return ParseError{err}
 		}
 	}
 	return nil
 }
 
-func assign(r interface{}, b []byte) error {
+func assign(r interface{}, b []byte, rng Range) error {
 	switch v := r.(type) {
 	case nil:
 		// Discard the match.
 	case func([]byte) error:
 		if err := v(b); err != nil {
+			return err
+		}
+	case func([]byte, Range) error:
+		if err := v(b, rng); err != nil {
 			return err
 		}
 	case *string:
